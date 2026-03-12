@@ -27,6 +27,9 @@
 
 ## Setup
 
+1. Primeiro, copie o arquivo `.env.example` e substitua o valor de `GEMINI_API_KEY` pela sua API Key do Gemini
+
+2. Execute os comandos abaixo
 ```bash
 # **.env.example disponível com as vars necessárias**
 $ npm install
