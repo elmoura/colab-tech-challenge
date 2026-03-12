@@ -11,3 +11,7 @@ O projeto está separado entre API (NestJS) e front-end web (Vite + React), ambo
 
 - [Arquitetura do back-end](./api/README.md#arquitetura)
 - [Arquitetura do front-end](./frontend/README.md#arquitetura)
+
+
+
+<img title="Resultado final do desafio" alt="Resultado final do desafio" src="./result.png">
