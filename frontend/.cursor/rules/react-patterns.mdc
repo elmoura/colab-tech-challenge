@@ -1,0 +1,220 @@
+---
+description: Regras de desenvolvimento para aplicativo React de relatos urbanos
+alwaysApply: false
+trigger: Ao iniciar uma nova feature ou componente relacionado a relatos/solicitações
+---
+# 🏙️ Projeto: Sistema de Relatos Urbanos (React)
+
+## Contexto do Domínio
+Este é um aplicativo onde cidadãos podem enviar relatos de problemas urbanos (buraco, iluminação, esgoto, etc.) para a prefeitura. O foco principal é o **fluxo de envio de relatos** e a **visualização/gestão desses relatos** (futuramente).
+
+## Stack Obrigatória
+- **Framework:** React 18+ com TypeScript
+- **Build Tool:** Vite
+- **Estilização:** TailwindCSS + Radix UI (componentes acessíveis)
+- **Estado e Dados:**
+  - React Query (@tanstack/react-query) para chamadas HTTP e cache
+  - React Hook Form para formulários + Zod para validação
+- **Testes:** Vitest + React Testing Library + MSW (para mock de APIs)
+- **Linting:** ESLint + Prettier (configurações do projeto)
+
+## 📁 Estrutura de Pastas (Detalhada)
+
+```
+src/
+├── assets/               # Imagens, ícones, fontes
+├── core/                  # Lógica de negócio pura
+│   ├── models/            # Interfaces/Types do domínio
+│   │   ├── report.ts      # Ex: IReport, ReportStatus, ReportCategory
+│   │   └── user.ts
+│   ├── services/          # Lógica de negócio (sem HTTP)
+│   │   └── reportCalculator.ts
+│   └── utils/             # Funções utilitárias gerais
+│
+├── shared/                 # Código reutilizável entre features
+│   ├── api/                # Camada de comunicação HTTP
+│   │   ├── httpClient.ts   # Instância do fetch com interceptors
+│   │   └── reportService.ts # Métodos: createReport, fetchReports, etc.
+│   │
+│   ├── components/         # Atomic Design
+│   │   ├── atoms/          # Botões, inputs, ícones (com Radix UI)
+│   │   │   ├── Button/
+│   │   │   └── Input/
+│   │   ├── molecules/      # Combinações de átomos
+│   │   │   ├── ReportCard/
+│   │   │   └── SearchBar/
+│   │   └── organisms/       # Seções complexas da UI
+│   │       ├── Header/
+│   │       └── ReportForm/
+│   │
+│   ├── hooks/               # Hooks compartilhados
+│   │   ├── useSendReport.ts  # Hook com React Query + Service
+│   │   └── useDebounce.ts
+│   │
+│   └── types/                # Tipos compartilhados (não domínio)
+│       └── api.types.ts
+│
+└── pages/                    # Páginas da aplicação (rotas)
+    ├── send-report/
+    │   ├── components/        # Componentes específicos da página
+    │   │   ├── LocationStep.tsx
+    │   │   └── CategoryStep.tsx
+    │   ├── hooks/             # Hooks específicos
+    │   │   ├── useSendReportForm.ts  # React Hook Form + Zod
+    │   │   └── useReportValidation.ts
+    │   ├── SendReportPage.tsx
+    │   └── SendReportPage.spec.tsx
+    │
+    └── dashboard/             # (futuro) Listagem de relatos
+├── router.tsx            # Configuração central de rotas React Router (AppRoutes)
+```
+
+## 📋 Regras de Implementação
+
+### 1. Componentes React
+- **Prefira componentes funcionais** com arrow functions nomeadas
+- **Use Radix UI** para componentes acessíveis (Dialog, Dropdown, etc.)
+- **Estilize com Tailwind** usando classes utilitárias (evite CSS customizado)
+- **Organize imports:** React → Bibliotecas → Componentes → Hooks → Tipos
+
+**Exemplo:**
+```tsx
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { Button } from '@/shared/components/atoms/Button';
+import { useSendReport } from '@/shared/hooks/useSendReport';
+import { IReportInput } from '@/core/models/report';
+
+export const SendReportPage = () => {
+  // implementação
+};
+```
+
+### 2. Formulários (React Hook Form + Zod)
+- **Sempre use Zod para validação** (esquemas no próprio hook)
+- **Integre com React Hook Form** via `zodResolver`
+- **Mensagens de erro** devem ser amigáveis e claras
+
+**Exemplo:**
+```tsx
+// hooks/useSendReportForm.ts
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+const reportSchema = z.object({
+  title: z.string().min(5, 'Título deve ter pelo menos 5 caracteres'),
+  category: z.enum(['iluminacao', 'buraco', 'esgoto']),
+  address: z.string().min(1, 'Endereço obrigatório'),
+});
+
+export type ReportFormData = z.infer<typeof reportSchema>;
+
+export const useSendReportForm = () => {
+  return useForm<ReportFormData>({
+    resolver: zodResolver(reportSchema),
+    defaultValues: { title: '', category: undefined, address: '' }
+  });
+};
+```
+
+### 3. Chamadas HTTP (React Query + Services)
+- **Services:** Funções puras que usam `fetch` (em `shared/api/`)
+- **Hooks:** Encapsulam chamadas com React Query (em `shared/hooks/` ou `pages/*/hooks/`)
+- **Sempre trate loading e error states**
+
+**Exemplo:**
+```tsx
+// shared/api/reportService.ts
+export const reportService = {
+  createReport: async (data: ReportFormData) => {
+    const response = await fetch('/api/reports', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Falha ao enviar relato');
+    return response.json();
+  }
+};
+
+// shared/hooks/useSendReport.ts
+import { useMutation } from '@tanstack/react-query';
+import { reportService } from '../api/reportService';
+
+export const useSendReport = () => {
+  return useMutation({
+    mutationFn: reportService.createReport,
+    onSuccess: () => {
+      // toast de sucesso, invalidar queries, etc.
+    }
+  });
+};
+```
+
+### 4. Testes (Vitest + RTL)
+- **Teste comportamento, não implementação**
+- **Use `screen`** para queries (evite `getByTestId` quando possível)
+- **Mock serviços** com MSW ou vi.mock
+
+**Exemplo:**
+```tsx
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { SendReportPage } from './SendReportPage';
+
+describe('SendReportPage', () => {
+  it('should show validation errors when form is submitted empty', async () => {
+    render(<SendReportPage />);
+    
+    await userEvent.click(screen.getByRole('button', { name: /enviar/i }));
+    
+    expect(await screen.findByText(/título deve ter/i)).toBeInTheDocument();
+  });
+});
+```
+
+### 5. Estilização com Tailwind
+- **Use classes utilitárias do Tailwind** (evite `style={{}}`)
+- **Organize classes** com plugin `prettier-plugin-tailwindcss`
+- **Crie componentes atômicos** para padrões reutilizáveis (ex: `<Button variant="primary">`)
+
+**Exemplo:**
+```tsx
+// shared/components/atoms/Button/Button.tsx
+export const Button = ({ variant = 'primary', ...props }) => {
+  const variants = {
+    primary: 'bg-blue-500 hover:bg-blue-700 text-white',
+    secondary: 'bg-gray-300 hover:bg-gray-400 text-gray-800'
+  };
+  
+  return (
+    <button 
+      className={`px-4 py-2 rounded ${variants[variant]}`}
+      {...props}
+    />
+  );
+};
+```
+
+## 🚀 Fluxo para Criar uma Nova Feature
+
+1. **Identifique o domínio** (ex: "editar relato")
+2. **Crie a estrutura de pastas** em `pages/[feature-name]/`
+3. **Defina os modelos/types** em `core/models/` (se novo)
+4. **Crie o service** em `shared/api/` (se nova rota)
+5. **Crie o hook de formulário** com React Hook Form + Zod
+6. **Crie o hook de mutation/query** com React Query
+7. **Construa os componentes** (se reutilizáveis, vá para `shared/components`)
+8. **Teste tudo** (usecase + componente + integração)
+9. **Adicione a rota** no roteador React Router, editando `src/router.tsx`:
+   - importe a nova página de `@/pages/[feature-name]/[Page].tsx`
+   - adicione um novo `<Route path="/novo-caminho" element={<NovaPage />} />`
+   - mantenha a rota principal `/` apontando para a página inicial de relatos (`SendReportPage`)
+
+## ⚠️ Lembretes Importantes
+- **Nunca** coloque lógica de negócio em componentes
+- **Nunca** chame hooks condicionalmente
+- **Sempre** trate erros de API com try/catch ou onError do React Query
+- **Sempre** adicione testes para casos de erro e sucesso
+- **Use Path Aliases** (`@/core`, `@/shared`, `@/pages`) - configurados no vite.config.mjs
+```
